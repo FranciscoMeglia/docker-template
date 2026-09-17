@@ -1,0 +1,89 @@
+  client_max_body_size 20M;
+
+  resolver 127.0.0.11 valid=10s ipv6=off;
+
+  # SSL
+  ssl_certificate     /etc/nginx/certs/${NGINX_CERT_FILE};
+  ssl_certificate_key /etc/nginx/certs/${NGINX_CERT_KEY};
+  ssl_protocols       TLSv1.2 TLSv1.3;
+  ssl_ciphers         HIGH:!aNULL:!MD5;
+  ssl_session_cache   shared:SSL:10m;
+  ssl_session_timeout 10m;
+
+  # Upstreams
+  upstream api {
+    zone api 64k;
+    server ${PROJECT_NAME}_api:${PORT_API} resolve;
+  }
+
+  upstream frontend {
+    zone frontend 64k;
+    server ${PROJECT_NAME}_frontend:${PORT_FRONTEND} resolve;
+  }
+
+  # Redirect HTTP → HTTPS
+  server {
+    listen 80 default_server;
+    server_name _;
+    return 301 https://$host$request_uri;
+  }
+
+  # Frontend
+  # ${NGINX_DOMAIN_FRONTEND}
+  server {
+    listen 443 ssl;
+    server_name ${NGINX_DOMAIN_FRONTEND};
+    server_tokens off;
+
+    location / {
+      proxy_pass         http://frontend;
+      proxy_set_header   Host              $host;
+      proxy_set_header   X-Real-IP         $remote_addr;
+      proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+      proxy_set_header   X-Forwarded-Proto https;
+    }
+  }
+
+  # API
+  # ${NGINX_DOMAIN_API}
+  server {
+    listen 443 ssl;
+    server_name ${NGINX_DOMAIN_API};
+    server_tokens off;
+
+    # API Django
+    location /api/ {
+      proxy_pass         http://api;
+      proxy_set_header   Host              $host;
+      proxy_set_header   X-Real-IP         $remote_addr;
+      proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+      proxy_set_header   X-Forwarded-Proto https;
+      proxy_set_header   X-Forwarded-Host  $host;
+      proxy_read_timeout    120s;
+      proxy_connect_timeout  10s;
+    }
+
+    # Django Admin
+    location /admin/ {
+      proxy_pass         http://api;
+      proxy_set_header   Host              $host;
+      proxy_set_header   X-Real-IP         $remote_addr;
+      proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+      proxy_set_header   X-Forwarded-Proto https;
+      proxy_set_header   X-Forwarded-Host  $host;
+    }
+
+    # Archivos estáticos Django
+    location /static/ {
+      proxy_pass         http://api;
+      proxy_set_header   Host              $host;
+      expires 30d;
+    }
+  }
+
+  # Catch-all HTTPS
+  server {
+    listen 443 ssl default_server;
+    server_name _;
+    return 444;
+  }

@@ -1,0 +1,24 @@
+services:
+  nginx:
+    image: nginx:${NGINX_VERSION}
+    container_name: ${PROJECT_NAME}_nginx
+    env_file:
+      - .env
+    environment:
+      - NGINX_ENVSUBST_TEMPLATE_SUFFIX=.template
+      - NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d
+      - NGINX_ENVSUBST_VARIABLES=PROJECT_NAME,NGINX_DOMAIN_FRONTEND,NGINX_DOMAIN_API,NGINX_CERT_FILE,NGINX_CERT_KEY,PORT_API,PORT_FRONTEND
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/${NGINX_TEMPLATE:-nginx.conf.template}:/etc/nginx/templates/nginx.conf.template:ro
+      - ${NGINX_CERT_PATH:-./certs}:/etc/nginx/certs:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    name: ${DOCKER_NETWORK}
+    external: true

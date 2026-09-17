@@ -1,0 +1,30 @@
+x-api-base: &api-base
+  image: ${REGISTRY}/${PROJECT_NAME}-api:${API_VERSION}
+  env_file:
+    - ./api/.env
+  networks:
+    - app-network
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *api-base
+    container_name: ${PROJECT_NAME}_api
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:${PORT_API}
+    expose:
+      - "${PORT_API}"
+
+  worker:
+    <<: *api-base
+    container_name: ${PROJECT_NAME}_worker
+    command: celery -A config worker -l info --concurrency=4
+
+  beat:
+    <<: *api-base
+    container_name: ${PROJECT_NAME}_beat
+    command: celery -A config beat -l info
+
+networks:
+  app-network:
+    name: ${DOCKER_NETWORK}
+    external: true

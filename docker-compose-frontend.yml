@@ -1,0 +1,16 @@
+services:
+  frontend:
+    image: ${REGISTRY}/${PROJECT_NAME}-frontend:${FRONTEND_VERSION}
+    container_name: ${PROJECT_NAME}_frontend
+    env_file:
+      - ./frontend/.env
+    expose:
+      - "${PORT_FRONTEND}"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    name: ${DOCKER_NETWORK}
+    external: true

@@ -1,0 +1,61 @@
+  client_max_body_size 20M;
+
+  resolver 127.0.0.11 valid=10s ipv6=off;
+
+  # Upstreams
+  upstream api {
+    zone api 64k;
+    server ${PROJECT_NAME}_api:${PORT_API} resolve;
+  }
+
+  upstream frontend {
+    zone frontend 64k;
+    server ${PROJECT_NAME}_frontend:${PORT_FRONTEND} resolve;
+  }
+
+  # Servidor único por IP
+  # Todos los servicios bajo paths en ${NGINX_DOMAIN_FRONTEND}
+  server {
+    listen 80;
+    server_name ${NGINX_DOMAIN_FRONTEND};
+    server_tokens off;
+
+    # Frontend (raíz)
+    location / {
+      proxy_pass         http://frontend;
+      proxy_set_header   Host              $host;
+      proxy_set_header   X-Real-IP         $remote_addr;
+      proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    }
+
+    # API Django
+    location /api/ {
+      proxy_pass         http://api;
+      proxy_set_header   Host              $host;
+      proxy_set_header   X-Real-IP         $remote_addr;
+      proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+
+      proxy_read_timeout    120s;
+      proxy_connect_timeout  10s;
+    }
+
+    # Django Admin
+    location /admin/ {
+      proxy_pass         http://api;
+      proxy_set_header   Host              $host;
+      proxy_set_header   X-Real-IP         $remote_addr;
+    }
+
+    # Archivos estáticos Django
+    location /static/ {
+      proxy_pass         http://api;
+      proxy_set_header   Host              $host;
+    }
+  }
+
+  # Catch-all
+  server {
+    listen 80 default_server;
+    server_name _;
+    return 444;
+  }
